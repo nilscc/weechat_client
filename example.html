@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- saved from url=(0045)https://weechat.org/files/temp/websocket.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <title>WeeChat + Relay + WebSocket</title>
+
+  <style>
+    body { font-family: Verdana; background: #EEEEEE; }
+    h1 { text-align: center; font-size: 1.2em; margin: 0.2em 0; text-shadow: 1px 1px 2px #BBBBBB; }
+    #output { min-height: 200px; font-family: Monospace; padding: 0.5em; background: white; border: solid 1px #CCCCCC; border-radius: 8px; }
+    .connected { font-family: Helvetica; font-size: 0.8em; margin: 0.2em 0; color: yellow; text-shadow: 1px 1px 2px black, -1px -1px 2px black, 1px -1px 2px black, -1px 1px 2px black; font-weight: bold; }
+    .disconnected { font-family: Helvetica; font-size: 0.8em; margin: 0.2em 0; color: orange; text-shadow: 1px 1px 2px #333333, -1px -1px 2px #333333, 1px -1px 2px #333333, -1px 1px 2px #333333; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    .recv { color: green; }
+    .sent { color: blue; }
+    #cmdline { margin: 0.25em 0 0 0; padding: 0 0.4em; background: white; border: solid 1px #CCCCCC; border-radius: 8px; }
+    #cmdline input { width: 100%; font-weight: bold; border: none; }
+    #cmdline input:focus { outline: none; }
+  </style>
+
+  <script language="javascript" type="text/javascript">
+    var output;
+    var hostport;
+    var proto;
+    var password;
+
+    function init()
+    {
+      let output = document.getElementById("output");
+      let input  = document.getElementById("input");
+
+      // query login data
+      hostport = prompt("Enter hostname:port of WeeChat/relay", "hostname:5000");
+      proto    = prompt("Protocol (weechat / irc)", "weechat");
+      password = prompt("Password (for relay)", "");
+
+      // create websocket & handle events
+      websocket = new WebSocket("wss://" + hostport + "/weechat");
+      websocket.onopen = function(evt) { onOpen(evt) };
+      websocket.onclose = function(evt) { onClose(evt) };
+      websocket.onmessage = function(evt) { onMessage(evt) };
+      websocket.onerror = function(evt) { onError(evt) };
+
+      // setup UI events: input buffer
+      input.addEventListener("keydown", function(e) {
+        if ("Enter" == e.key && "" != this.value) {
+          doSend(this.value);
+          this.value = "";
+        }
+      });
+    }
+
+    function onOpen(evt) {
+      display("connected", "Connected to " + hostport);
+      if (proto == "weechat") {
+        doSend("init password=" + password + "\ninfo version\ntest\n");
+      } else {
+        doSend("PASS " + password + "\r\nNICK test\r\nUSER test 0 * :test\r\n");
+      }
+    }
+
+    function onClose(evt) {
+      display("disconnected", "Disconnected");
+    }
+
+    function onMessage(evt) {
+      display("recv", "&rArr; " + evt.data);
+    }
+
+    function onError(evt) {
+      display("error", "ERROR: " + evt.data);
+    }
+
+    function doSend(message) {
+      msgs = message.replace(/[\r\n]+$/g, "").split("\n");
+      for (var i = 0; i < msgs.length; i++) {
+        display("sent", "&lArr; " + msgs[i]);
+      }
+      websocket.send(message);
+    }
+
+    function display(class_name, message) {
+      var div = document.createElement("div");
+      div.className = class_name;
+      div.innerHTML = message;
+      output.appendChild(div);
+    }
+
+    // Initialize on load
+    window.addEventListener("load", init, false);
+
+  </script>
+</head>
+<body>
+  <h1>WeeChat + Relay + WebSocket</h1>
+  <div id="output"></div>
+  <div id="cmdline"><input type="text" id="input"></div>
+</body>
+</html>
